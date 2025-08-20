@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Pressable, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Pressable, Alert, Animated, Easing } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,42 +11,51 @@ export default function Index() {
   const [image, setImage] = useState<string | null>(null);
   const [listaFotos, setListaFotos] = useState<string[]>([]);
   const [fileSize, setFileSize] = useState<number | undefined>(undefined);
+  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
 
-  // Animação do botão "Adicionar Foto"
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  // Animações para os botões
   const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  // Animação dos botões de ação
   const saveScaleAnim = useRef(new Animated.Value(1)).current;
   const cancelScaleAnim = useRef(new Animated.Value(1)).current;
   const deleteScaleAnim = useRef(new Animated.Value(1)).current;
+  const hoverAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     getImage();
-    
-    // Animação de pulso contínua para o botão principal
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.05,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
 
+  const handleHoverIn = (index: number | null = null) => {
+    setHoveredItem(index);
+    Animated.timing(hoverAnim, {
+      toValue: 1,
+      duration: 200,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true
+    }).start();
+  };
+
+  const handleHoverOut = () => {
+    setHoveredItem(null);
+    Animated.timing(hoverAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true
+    }).start();
+  };
+
   const handleAddPressIn = () => {
-    Animated.spring(scaleAnim, { toValue: 0.9, friction: 3, useNativeDriver: true }).start();
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 0.95, friction: 3, useNativeDriver: true }),
+      Animated.timing(hoverAnim, { toValue: 1, duration: 150, useNativeDriver: true })
+    ]).start();
   };
 
   const handleAddPressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }).start(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }),
+      Animated.timing(hoverAnim, { toValue: 0, duration: 200, useNativeDriver: true })
+    ]).start(() => {
       pickImage();
     });
   };
@@ -125,6 +134,17 @@ export default function Index() {
     return `${kb.toFixed(2)} KB`;
   };
 
+  // Interpolação para efeitos de brilho
+  const glowOpacity = hoverAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.6]
+  });
+
+  const glowScale = hoverAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.05]
+  });
+
   return (
     <View style={styles.container}>
       
@@ -137,7 +157,21 @@ export default function Index() {
               onPressIn={() => handleActionPressIn(saveScaleAnim)}
               onPressOut={() => handleActionPressOut(saveScaleAnim, () => storeImage(image))}
             >
-              <Animated.View style={[styles.iconButton, styles.saveButton, { transform: [{ scale: saveScaleAnim }] }]}>
+              <Animated.View style={[
+                styles.iconButton, 
+                styles.saveButton, 
+                { 
+                  transform: [{ scale: saveScaleAnim }],
+                }
+              ]}>
+                <Animated.View style={[
+                  styles.glowEffect,
+                  {
+                    opacity: glowOpacity,
+                    backgroundColor: '#00FF87',
+                    transform: [{ scale: glowScale }]
+                  }
+                ]} />
                 <MaterialCommunityIcons name="content-save" size={26} color="#00FF87" />
               </Animated.View>
             </Pressable>
@@ -145,7 +179,21 @@ export default function Index() {
               onPressIn={() => handleActionPressIn(cancelScaleAnim)}
               onPressOut={() => handleActionPressOut(cancelScaleAnim, () => setImage(null))}
             >
-              <Animated.View style={[styles.iconButton, styles.cancelButton, { transform: [{ scale: cancelScaleAnim }] }]}>
+              <Animated.View style={[
+                styles.iconButton, 
+                styles.cancelButton, 
+                { 
+                  transform: [{ scale: cancelScaleAnim }],
+                }
+              ]}>
+                <Animated.View style={[
+                  styles.glowEffect,
+                  {
+                    opacity: glowOpacity,
+                    backgroundColor: '#FF00FF',
+                    transform: [{ scale: glowScale }]
+                  }
+                ]} />
                 <MaterialCommunityIcons name="close-circle" size={26} color="#FF00FF" />
               </Animated.View>
             </Pressable>
@@ -156,18 +204,24 @@ export default function Index() {
           onPressIn={handleAddPressIn}
           onPressOut={handleAddPressOut}
         >
-          <Animated.View style={[styles.addButton, { transform: [{ scale: pulseAnim }] }]}>
-            <LinearGradient
-              colors={['#00C6FF', '#0072FF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.addButtonGradient}
-            >
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <MaterialCommunityIcons name="plus-circle" size={52} color="#fff" />
-                <Text style={styles.addButtonText}>Adicionar Foto</Text>
-              </Animated.View>
-            </LinearGradient>
+          <Animated.View style={[
+            styles.addButton, 
+            { 
+              transform: [{ scale: scaleAnim }],
+            }
+          ]}>
+            {/* Efeito de brilho no botão principal */}
+            <Animated.View style={[
+              styles.glowEffect,
+              {
+                opacity: glowOpacity,
+                backgroundColor: '#007BFF',
+                transform: [{ scale: glowScale }]
+              }
+            ]} />
+            
+            <MaterialCommunityIcons name="plus" size={30} color="#fff" style={styles.addButtonIcon} />
+            <Text style={styles.addButtonText}>Adicionar Foto</Text>
           </Animated.View>
         </Pressable>
       )}
@@ -176,18 +230,35 @@ export default function Index() {
 
       <ScrollView contentContainerStyle={styles.gallery} horizontal={true}>
         {listaFotos.map((foto, indice) => (
-          <View key={indice} style={styles.galleryItem}>
-            <Image source={{ uri: foto }} style={styles.galleryImage} />
-            <Pressable
-              onPressIn={() => handleActionPressIn(deleteScaleAnim)}
-              onPressOut={() => handleActionPressOut(deleteScaleAnim, () => removeImage(indice))}
-              style={styles.deleteButton}
-            >
-              <Animated.View style={{ transform: [{ scale: deleteScaleAnim }] }}>
-                <MaterialCommunityIcons name="delete" size={22} color="#FF00FF" />
-              </Animated.View>
-            </Pressable>
-          </View>
+          <Pressable
+            key={indice}
+            onPressIn={() => handleHoverIn(indice)}
+            onPressOut={handleHoverOut}
+          >
+            <View style={styles.galleryItem}>
+              <Image source={{ uri: foto }} style={styles.galleryImage} />
+              
+              {/* Overlay de brilho quando hover */}
+              {hoveredItem === indice && (
+                <Animated.View style={[
+                  styles.hoverOverlay,
+                  {
+                    opacity: hoverAnim,
+                  }
+                ]} />
+              )}
+              
+              <Pressable
+                onPressIn={() => handleActionPressIn(deleteScaleAnim)}
+                onPressOut={() => handleActionPressOut(deleteScaleAnim, () => removeImage(indice))}
+                style={styles.deleteButton}
+              >
+                <Animated.View style={{ transform: [{ scale: deleteScaleAnim }] }}>
+                  <MaterialCommunityIcons name="delete" size={22} color="#FF00FF" />
+                </Animated.View>
+              </Pressable>
+            </View>
+          </Pressable>
         ))}
       </ScrollView>
     </View>
@@ -246,6 +317,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 4,
+    overflow: 'hidden',
+    position: 'relative',
   },
   saveButton: {
     backgroundColor: '#2C2C2C',
@@ -261,24 +334,29 @@ const styles = StyleSheet.create({
   },
   addButton: {
     alignSelf: 'center',
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#00C6FF',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  addButtonGradient: {
-    padding: 24,
+    backgroundColor: '#007BFF',
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  addButtonIcon: {
+    marginBottom: 10,
+    zIndex: 2,
   },
   addButtonText: {
-    marginTop: 8,
+    color: '#fff',
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    zIndex: 2,
   },
   gallery: {
     flexDirection: 'row',
@@ -314,5 +392,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.8,
     shadowRadius: 6,
     elevation: 8,
+    zIndex: 3,
+  },
+  // Efeitos visuais
+  glowEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
+  },
+  hoverOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
 });
