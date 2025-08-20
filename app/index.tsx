@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Pressable, Alert } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, Pressable, Alert, Animated } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,9 +12,54 @@ export default function Index() {
   const [listaFotos, setListaFotos] = useState<string[]>([]);
   const [fileSize, setFileSize] = useState<number | undefined>(undefined);
 
+  // Animação do botão "Adicionar Foto"
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Animação dos botões de ação
+  const saveScaleAnim = useRef(new Animated.Value(1)).current;
+  const cancelScaleAnim = useRef(new Animated.Value(1)).current;
+  const deleteScaleAnim = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
     getImage();
+    
+    // Animação de pulso contínua para o botão principal
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
+
+  const handleAddPressIn = () => {
+    Animated.spring(scaleAnim, { toValue: 0.9, friction: 3, useNativeDriver: true }).start();
+  };
+
+  const handleAddPressOut = () => {
+    Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }).start(() => {
+      pickImage();
+    });
+  };
+
+  const handleActionPressIn = (anim: Animated.Value) => {
+    Animated.spring(anim, { toValue: 0.9, friction: 3, useNativeDriver: true }).start();
+  };
+
+  const handleActionPressOut = (anim: Animated.Value, action: () => void) => {
+    Animated.spring(anim, { toValue: 1, friction: 3, useNativeDriver: true }).start(() => {
+      action();
+    });
+  };
 
   const storeImage = async (value: string) => {
     try {
@@ -88,39 +133,59 @@ export default function Index() {
           <Image source={{ uri: image }} style={styles.preview} />
           <Text style={styles.fileSize}>{convertBytesToHuman(fileSize)}</Text>
           <View style={styles.actionButtons}>
-            <Pressable style={[styles.iconButton, styles.saveButton]} onPress={() => storeImage(image)}>
-              <MaterialCommunityIcons name="content-save" size={26} color="#00FF87" />
+            <Pressable 
+              onPressIn={() => handleActionPressIn(saveScaleAnim)}
+              onPressOut={() => handleActionPressOut(saveScaleAnim, () => storeImage(image))}
+            >
+              <Animated.View style={[styles.iconButton, styles.saveButton, { transform: [{ scale: saveScaleAnim }] }]}>
+                <MaterialCommunityIcons name="content-save" size={26} color="#00FF87" />
+              </Animated.View>
             </Pressable>
-            <Pressable style={[styles.iconButton, styles.cancelButton]} onPress={() => setImage(null)}>
-              <MaterialCommunityIcons name="close-circle" size={26} color="#FF00FF" />
+            <Pressable 
+              onPressIn={() => handleActionPressIn(cancelScaleAnim)}
+              onPressOut={() => handleActionPressOut(cancelScaleAnim, () => setImage(null))}
+            >
+              <Animated.View style={[styles.iconButton, styles.cancelButton, { transform: [{ scale: cancelScaleAnim }] }]}>
+                <MaterialCommunityIcons name="close-circle" size={26} color="#FF00FF" />
+              </Animated.View>
             </Pressable>
           </View>
         </View>
       ) : (
-        <Pressable style={styles.addButton} onPress={pickImage}>
-          <LinearGradient
-            colors={['#00C6FF', '#0072FF']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.addButtonGradient}
-          >
-            <MaterialCommunityIcons name="plus-circle" size={52} color="#fff" />
-            <Text style={styles.addButtonText}>Adicionar Foto</Text>
-          </LinearGradient>
+        <Pressable 
+          onPressIn={handleAddPressIn}
+          onPressOut={handleAddPressOut}
+        >
+          <Animated.View style={[styles.addButton, { transform: [{ scale: pulseAnim }] }]}>
+            <LinearGradient
+              colors={['#00C6FF', '#0072FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.addButtonGradient}
+            >
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <MaterialCommunityIcons name="plus-circle" size={52} color="#fff" />
+                <Text style={styles.addButtonText}>Adicionar Foto</Text>
+              </Animated.View>
+            </LinearGradient>
+          </Animated.View>
         </Pressable>
       )}
 
       {listaFotos.length > 0 && <Text style={styles.subtitle}>📂 Fotos Salvas</Text>}
 
-      <ScrollView contentContainerStyle={styles.gallery}>
+      <ScrollView contentContainerStyle={styles.gallery} horizontal={true}>
         {listaFotos.map((foto, indice) => (
           <View key={indice} style={styles.galleryItem}>
             <Image source={{ uri: foto }} style={styles.galleryImage} />
             <Pressable
+              onPressIn={() => handleActionPressIn(deleteScaleAnim)}
+              onPressOut={() => handleActionPressOut(deleteScaleAnim, () => removeImage(indice))}
               style={styles.deleteButton}
-              onPress={() => removeImage(indice)}
             >
-              <MaterialCommunityIcons name="delete" size={22} color="#FF00FF" />
+              <Animated.View style={{ transform: [{ scale: deleteScaleAnim }] }}>
+                <MaterialCommunityIcons name="delete" size={22} color="#FF00FF" />
+              </Animated.View>
             </Pressable>
           </View>
         ))}
@@ -184,9 +249,15 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#2C2C2C',
+    shadowColor: '#00FF87',
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
   },
   cancelButton: {
     backgroundColor: '#2C2C2C',
+    shadowColor: '#FF00FF',
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
   },
   addButton: {
     alignSelf: 'center',
@@ -194,7 +265,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#00C6FF',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.8,
     shadowRadius: 10,
     elevation: 8,
   },
@@ -211,20 +282,18 @@ const styles = StyleSheet.create({
   },
   gallery: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    padding: 10,
+    padding: 20,
     gap: 12,
   },
   galleryItem: {
     position: 'relative',
-    width: '45%',
-    aspectRatio: 1,
+    width: 250,
+    height: 250,
     borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#00C6FF',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 5,
     elevation: 5,
   },
@@ -240,5 +309,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     borderRadius: 20,
     padding: 6,
+    shadowColor: '#FF00FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 8,
   },
 });
