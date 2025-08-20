@@ -33,6 +33,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "para acessar essa função tu precisa de acesso truta",
+           "cameraPermission":"da acesso ai irmao"
+        }
+
       ]
     ],
     "experiments": {
